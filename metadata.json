@@ -1,0 +1,6 @@
+{
+  "name": "TRC20 Wallet Gas Sponsor & Withdrawal Helper",
+  "description": "Connect MetaMask and TRC20 wallets, sponsor gas network fees, configure blockchain API keys, and withdraw stuck TRX/TRC20 tokens to destination addresses.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
