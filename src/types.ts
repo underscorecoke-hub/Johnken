@@ -87,3 +87,14 @@ export interface NetworkConfig {
   chainHex?: string;
   isEvm: boolean;
 }
+
+export interface TokenPriceInfo {
+  usd: number;
+  change24h: number;
+}
+
+export interface MarketPrices {
+  trx: TokenPriceInfo;
+  usdt: TokenPriceInfo;
+  lastUpdated: string;
+}

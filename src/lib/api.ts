@@ -1,4 +1,11 @@
-import { ApiSettings, WalletState, GasEstimation, TransactionRecord, SponsorPoolInfo, ApiKeyValidation, NetworkType } from '../types';
+import { ApiSettings, WalletState, GasEstimation, TransactionRecord, SponsorPoolInfo, ApiKeyValidation, NetworkType, MarketPrices } from '../types';
+
+export async function getMarketPrices(): Promise<MarketPrices> {
+  const res = await fetch('/api/prices');
+  const data = await res.json();
+  if (!data.success) throw new Error('Failed to fetch market prices');
+  return data.prices;
+}
 
 export async function getApiSettings(): Promise<ApiSettings> {
   const res = await fetch('/api/settings');

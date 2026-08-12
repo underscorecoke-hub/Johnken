@@ -1,8 +1,9 @@
-import React from 'react';
-import { WalletState, NetworkType, SponsorPoolInfo } from '../types';
+import React, { useState, useEffect } from 'react';
+import { WalletState, NetworkType, SponsorPoolInfo, MarketPrices } from '../types';
 import { NETWORKS } from '../lib/networks';
 import { truncateAddress } from '../lib/wallet';
-import { Wallet, Settings, HelpCircle, Shield, RefreshCw, Zap, Cpu } from 'lucide-react';
+import { getMarketPrices } from '../lib/api';
+import { Wallet, Settings, HelpCircle, Shield, RefreshCw, Zap, Cpu, TrendingUp, TrendingDown, DollarSign, Activity } from 'lucide-react';
 
 interface NavbarProps {
   wallet: WalletState;
@@ -27,6 +28,32 @@ export const Navbar: React.FC<NavbarProps> = ({
   onRefreshBalance,
   isLoadingBalance
 }) => {
+  const [prices, setPrices] = useState<MarketPrices | null>({
+    trx: { usd: 0.2452, change24h: 1.85 },
+    usdt: { usd: 1.0001, change24h: 0.02 },
+    lastUpdated: new Date().toISOString()
+  });
+  const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
+
+  // Poll real-time market prices
+  useEffect(() => {
+    fetchPrices();
+    const interval = setInterval(fetchPrices, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchPrices = async () => {
+    try {
+      setIsUpdatingPrices(true);
+      const data = await getMarketPrices();
+      setPrices(data);
+    } catch (e) {
+      console.warn('Failed to fetch market prices:', e);
+    } finally {
+      setIsUpdatingPrices(false);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -49,8 +76,72 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
+          {/* Center Real-Time Price Ticker */}
+          {prices && (
+            <div className="hidden xl:flex items-center space-x-3 bg-zinc-900/90 border border-zinc-800/80 rounded-xl px-3 py-1.5 text-xs">
+              <div className="flex items-center space-x-1.5 text-zinc-400 font-medium">
+                <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span className="text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">Live Rates</span>
+              </div>
+
+              <div className="h-3.5 w-px bg-zinc-800" />
+
+              {/* TRX Rate */}
+              <div className="flex items-center space-x-1.5" title={`TRX USD Price: $${prices.trx.usd}`}>
+                <span className="font-bold text-zinc-200">TRX:</span>
+                <span className="font-mono font-semibold text-amber-400">${prices.trx.usd.toFixed(4)}</span>
+                <span
+                  className={`inline-flex items-center text-[10px] font-semibold px-1 py-0.2 rounded ${
+                    prices.trx.change24h >= 0
+                      ? 'bg-emerald-500/10 text-emerald-400'
+                      : 'bg-rose-500/10 text-rose-400'
+                  }`}
+                >
+                  {prices.trx.change24h >= 0 ? (
+                    <TrendingUp className="w-2.5 h-2.5 mr-0.5" />
+                  ) : (
+                    <TrendingDown className="w-2.5 h-2.5 mr-0.5" />
+                  )}
+                  {prices.trx.change24h >= 0 ? '+' : ''}
+                  {prices.trx.change24h.toFixed(2)}%
+                </span>
+              </div>
+
+              <div className="h-3.5 w-px bg-zinc-800" />
+
+              {/* USDT Rate */}
+              <div className="flex items-center space-x-1.5" title={`USDT USD Price: $${prices.usdt.usd}`}>
+                <span className="font-bold text-zinc-200">USDT:</span>
+                <span className="font-mono font-semibold text-emerald-400">${prices.usdt.usd.toFixed(2)}</span>
+                <span className="inline-flex items-center text-[10px] font-semibold px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400">
+                  <TrendingUp className="w-2.5 h-2.5 mr-0.5" />
+                  +{prices.usdt.change24h.toFixed(2)}%
+                </span>
+              </div>
+
+              {/* Price Manual Refresh Button */}
+              <button
+                onClick={fetchPrices}
+                disabled={isUpdatingPrices}
+                title="Refresh Market Prices"
+                className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors disabled:opacity-40"
+              >
+                <RefreshCw className={`w-3 h-3 ${isUpdatingPrices ? 'animate-spin text-amber-400' : ''}`} />
+              </button>
+            </div>
+          )}
+
           {/* Right Action Controls */}
           <div className="flex items-center space-x-3">
+
+            {/* Mobile/Compact Market Ticker for Medium Screens */}
+            {prices && (
+              <div className="flex xl:hidden items-center space-x-2 bg-zinc-900 border border-zinc-800/80 rounded-lg px-2.5 py-1 text-xs">
+                <span className="font-bold text-amber-400 font-mono">TRX ${prices.trx.usd.toFixed(3)}</span>
+                <span className="text-zinc-600">|</span>
+                <span className="font-bold text-emerald-400 font-mono">USDT $1.00</span>
+              </div>
+            )}
 
             {/* Network Selector */}
             <div className="hidden md:flex items-center space-x-2 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
@@ -133,3 +224,4 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+

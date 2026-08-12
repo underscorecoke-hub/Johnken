@@ -33,7 +33,12 @@ export const WalletConnectModal: React.FC<WalletConnectModalProps> = ({
       onConnectSuccess(state);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to connect MetaMask');
+      const pageUrl = typeof window !== 'undefined' ? window.location.href.replace(/^https?:\/\//, '') : '';
+      const deepLink = `https://metamask.app.link/dapp/${pageUrl}`;
+      if (typeof window !== 'undefined') {
+        window.open(deepLink, '_blank');
+      }
+      setErrorMsg('MetaMask extension not detected. Opening MetaMask DApp session link...');
     } finally {
       setIsConnecting(false);
     }
