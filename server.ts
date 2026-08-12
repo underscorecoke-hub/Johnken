@@ -337,7 +337,7 @@ app.post('/api/check-balance', async (req: Request, res: Response) => {
         }
 
         if (accRes.ok) {
-          const accData = await accRes.json();
+          const accData = await accRes.json().catch(() => ({}));
           if (accData.data && accData.data.length > 0) {
             const acc = accData.data[0];
             trxBalance = (acc.balance || 0) / 1000000; // SUN to TRX

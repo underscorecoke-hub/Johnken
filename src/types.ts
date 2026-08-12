@@ -32,6 +32,7 @@ export interface WalletState {
 }
 
 export interface GasEstimation {
+  success?: boolean;
   requiredGasFeeTrx: number;
   requiredEnergy: number;
   requiredBandwidth: number;
